@@ -2,11 +2,10 @@ services:
   - type: web
     name: art-track-weather
     env: python
-    pythonVersion: "3.11"
-    region: frankfurt  # Close to your track's lat/lon (Spain/Portugal)
+    region: frankfurt
     plan: free
     buildCommand: |
       pip install --upgrade pip
-      pip install -r requirements.txt
+      pip install -r requirements.txt --no-cache-dir  # ← Forces clean install, no old wheels
     startCommand: gunicorn --workers 1 --bind 0.0.0.0:$PORT rain_dec:app
     autoDeploy: true
