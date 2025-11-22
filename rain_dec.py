@@ -14,6 +14,7 @@ from io import BytesIO
 import matplotlib.pyplot as plt
 import csv
 import os
+import logging
 
 # ==== CONFIG ====
 latitude = 36.710211448928376
@@ -618,7 +619,7 @@ def index():
 # Start background thread
 threading.Thread(target=fetch_and_store, daemon=True).start()
 
-# Global flag to ensure thread starts only once (prevents Gunicorn duplicates)
+# Global flag to ensure thread starts only once
 _thread_started = False
 _thread_lock = threading.Lock()
 
@@ -626,17 +627,25 @@ def start_background_thread():
     global _thread_started
     with _thread_lock:
         if _thread_started:
-            print("Background thread already running — skipping duplicate start.")
+            logging.info("Background thread already running — skipping duplicate.")
             return
-        print("Starting background data fetcher thread...")
-        t = threading.Thread(target=fetch_and_store, daemon=False)  # Non-daemon: Survives in Gunicorn
+        logging.info("🚀 Starting background data fetcher thread...")
+        t = threading.Thread(target=fetch_and_store, daemon=False)
+        t.daemon = False  # Ensure it survives Gunicorn
         t.start()
         _thread_started = True
-        print("Background thread started successfully!")
+        logging.info("✅ Background thread started! Fetching WeatherLink every 5 min.")
 
-# Start the thread on module import (works with Gunicorn)
+# Fire it on import (Gunicorn-safe)
 start_background_thread()
 
-# Your existing if __name__ block (keep for local testing)
+# Bonus: Add a /health endpoint to test thread status (visit https://yourapp.onrender.com/health)
+@app.route('/health')
+def health():
+    with data_lock:
+        last_time = historical_data[-1]['timestamp'].strftime('%Y-%m-%d %H:%M') if historical_data else 'No data yet'
+        record_count = len(historical_data)
+    return f"App healthy! Records: {record_count}, Last update: {last_time}. Thread: {'Running' if _thread_started else 'Stopped'}"
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=False)

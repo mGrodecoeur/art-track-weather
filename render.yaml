@@ -3,9 +3,9 @@ services:
     name: art-track-weather
     env: python
     region: frankfurt
-    plan: starter  # ← Your paid plan: Always on, no sleeps!
+    plan: starter
     buildCommand: |
       pip install --upgrade pip
       pip install -r requirements.txt --no-cache-dir
-    startCommand: gunicorn --worker-class gevent --workers 1 --worker-connections 1000 --bind 0.0.0.0:$PORT rain_dec:app
+    startCommand: gunicorn --workers 1 --bind 0.0.0.0:$PORT rain_dec:app
     autoDeploy: true
