@@ -17,6 +17,8 @@ import os
 import atexit
 import logging
 
+app = Flask(__name__)
+
 logging.basicConfig(level=logging.INFO)
 
 _thread = None
