@@ -1,5 +1,3 @@
-app = Flask(__name__)
-
 import requests
 from flask import Flask, render_template_string, request
 from datetime import datetime, timedelta
@@ -15,6 +13,8 @@ from io import BytesIO
 import matplotlib.pyplot as plt
 import csv
 import os
+
+app = Flask(__name__)
 
 # ==== CONFIG ====
 latitude = 36.710211448928376
