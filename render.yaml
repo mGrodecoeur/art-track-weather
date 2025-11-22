@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: art-track-weather
+    env: python
+    region: frankfurt    # closest to Spain
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn rain_dec:app
+    autoDeploy: true
