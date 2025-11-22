@@ -14,7 +14,26 @@ from io import BytesIO
 import matplotlib.pyplot as plt
 import csv
 import os
+import atexit
 import logging
+
+logging.basicConfig(level=logging.INFO)
+
+_thread = None
+
+def start_background_fetcher():
+    global _thread
+    if _thread is None:
+        logging.info("Starting WeatherLink background fetcher thread...")
+        _thread = threading.Thread(target=fetch_and_store, daemon=False)
+        _thread.start()
+        logging.info("Background thread started successfully!")
+        # Optional: make sure it shuts down cleanly
+        atexit.register(lambda: _thread.join() if _thread.is_alive() else None)
+
+# This runs when the Flask app is created → works on Render + Gunicorn
+with app.app_context():
+    start_background_fetcher()
 
 # ==== CONFIG ====
 latitude = 36.710211448928376
@@ -124,7 +143,9 @@ def fetch_and_store():
                 with data_lock:
                     historical_data.append(metrics)
                     save_historical_data()
-        time.sleep(300)
+                    logging.info(
+                        f"NEW DATA RECORDED @ {metrics['timestamp']} | Track: {metrics.get('temp_55')}°C | Air: {metrics.get('temp_43')}°C")
+            time.sleep(300)
 
 
 # ==== WEATHER ICONS (simple text-based) ====
@@ -614,38 +635,6 @@ def index():
                                   track_svg=track_svg,
                                   wind_dir_deg = wind_dir_deg
                                   )
-
-
-# Start background thread
-threading.Thread(target=fetch_and_store, daemon=True).start()
-
-# Global flag to ensure thread starts only once
-_thread_started = False
-_thread_lock = threading.Lock()
-
-def start_background_thread():
-    global _thread_started
-    with _thread_lock:
-        if _thread_started:
-            logging.info("Background thread already running — skipping duplicate.")
-            return
-        logging.info("🚀 Starting background data fetcher thread...")
-        t = threading.Thread(target=fetch_and_store, daemon=False)
-        t.daemon = False  # Ensure it survives Gunicorn
-        t.start()
-        _thread_started = True
-        logging.info("✅ Background thread started! Fetching WeatherLink every 5 min.")
-
-# Fire it on import (Gunicorn-safe)
-start_background_thread()
-
-# Bonus: Add a /health endpoint to test thread status (visit https://yourapp.onrender.com/health)
-@app.route('/health')
-def health():
-    with data_lock:
-        last_time = historical_data[-1]['timestamp'].strftime('%Y-%m-%d %H:%M') if historical_data else 'No data yet'
-        record_count = len(historical_data)
-    return f"App healthy! Records: {record_count}, Last update: {last_time}. Thread: {'Running' if _thread_started else 'Stopped'}"
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=False)
