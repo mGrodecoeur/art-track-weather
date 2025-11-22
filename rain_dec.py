@@ -534,6 +534,9 @@ with app.app_context():
 
 @app.route("/")
 def index():
+    load_historical_data()
+    logging.info(
+        f"Page loaded – now using {len(historical_data)} records (last: {historical_data[-1]['timestamp'] if historical_data else 'none'})")
     weather_data = get_metno_weather()
     live_data = get_live_weather_data()
 
