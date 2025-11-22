@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Weather Track Visualizer</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+        #ui { position: absolute; top: 10px; left: 10px; color: white; }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <button id="loadWeather">Load Weather for Paris</button>
+        <p id="weatherInfo">Wind: Loading...</p>
+    </div>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.167.1/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.167.1/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB); // Sky blue
+
+        const container = document.body;
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        // Orthographic camera for isometric view
+        const frustumSize = 100; // Adjust based on your SVG size
+        const aspect = width / height;
+        const camera = new THREE.OrthographicCamera(
+            frustumSize * aspect / -2,
+            frustumSize * aspect / 2,
+            frustumSize / 2,
+            frustumSize / -2,
+            1,
+            1000
+        );
+        camera.position.set(50, 50, 50); // 3/4 isometric position
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(width, height);
+        container.appendChild(renderer.domElement);
+
+        // Orbit controls for UI rotation
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableZoom = true;
+        controls.enablePan = true;
+
+        // Group for the track
+        const trackGroup = new THREE.Group();
+        scene.add(trackGroup);
+
+        // Load SVG and extrude to 3D
+        const loader = new SVGLoader();
+        const svgFile = 'aut-info.svg'; // Replace with your actual SVG file name or full path/URL
+
+        loader.load(
+            svgFile,
+            (data) => {
+                console.log('SVG loaded successfully');
+                const paths = data.paths;
+                for (let i = 0; i < paths.length; i++) {
+                    const path = paths[i];
+                    const shapes = SVGLoader.createShapes(path);
+                    for (let j = 0; j < shapes.length; j++) {
+                        const shape = shapes[j];
+                        const geometry = new THREE.ExtrudeGeometry(shape, {
+                            depth: 5, // Extrusion depth
+                            bevelEnabled: false
+                        });
+                        const material = new THREE.MeshBasicMaterial({
+                            color: path.color || 0x000000, // Fallback color if none
+                            side: THREE.DoubleSide
+                        });
+                        const mesh = new THREE.Mesh(geometry, material);
+                        trackGroup.add(mesh);
+                    }
+                }
+                // Center the track
+                const box = new THREE.Box3().setFromObject(trackGroup);
+                const center = box.getCenter(new THREE.Vector3());
+                trackGroup.position.sub(center);
+            },
+            (xhr) => {
+                console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+            },
+            (error) => {
+                console.error('Error loading SVG:', error);
+                alert('Failed to load SVG. Check console for details. Common issues: File not found, invalid SVG format, or CORS restrictions if loading from URL.');
+            }
+        );
+
+        // Particle system for wind visualization
+        const particleCount = 1000;
+        const particlesGeometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        const velocities = new Float32Array(particleCount * 3);
+
+        for (let i = 0; i < particleCount; i++) {
+            positions[i * 3] = Math.random() * 200 - 100;
+            positions[i * 3 + 1] = Math.random() * 10;
+            positions[i * 3 + 2] = Math.random() * 200 - 100;
+            velocities[i * 3] = 0;
+            velocities[i * 3 + 1] = 0;
+            velocities[i * 3 + 2] = 0;
+        }
+
+        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const particlesMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.5 });
+        const particles = new THREE.Points(particlesGeometry, particlesMaterial);
+        scene.add(particles);
+
+        let windSpeed = 0;
+        let windDirection = 0;
+
+        // Function to update wind
+        function updateWind(newSpeed, newDirection) {
+            windSpeed = newSpeed / 10;
+            windDirection = newDirection;
+            document.getElementById('weatherInfo').textContent = `Wind: ${newSpeed} km/h from ${newDirection}°`;
+
+            trackGroup.rotation.y = (windDirection * Math.PI / 180) - Math.PI;
+
+            const windVector = new THREE.Vector3(0, 0, -windSpeed);
+            for (let i = 0; i < particleCount; i++) {
+                velocities[i * 3] = windVector.x;
+                velocities[i * 3 + 1] = windVector.y;
+                velocities[i * 3 + 2] = windVector.z;
+            }
+        }
+
+        // Fetch weather
+        async function fetchWeather(lat, lon) {
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=wind_speed_10m,wind_direction_10m`;
+            const response = await fetch(url);
+            const data = await response.json();
+            const speed = data.current.wind_speed_10m;
+            const dir = data.current.wind_direction_10m;
+            updateWind(speed, dir);
+        }
+
+        // Button to load weather
+        document.getElementById('loadWeather').addEventListener('click', () => {
+            fetchWeather(48.8566, 2.3522);
+        });
+
+        // Animation loop
+        function animate(time) {
+            requestAnimationFrame(animate);
+
+            const delta = 0.01;
+            const posAttr = particlesGeometry.attributes.position;
+            for (let i = 0; i < particleCount; i++) {
+                posAttr.array[i * 3] += velocities[i * 3] * delta;
+                posAttr.array[i * 3 + 1] += velocities[i * 3 + 1] * delta;
+                posAttr.array[i * 3 + 2] += velocities[i * 3 + 2] * delta;
+
+                if (Math.abs(posAttr.array[i * 3]) > 100 || Math.abs(posAttr.array[i * 3 + 2]) > 100) {
+                    posAttr.array[i * 3] = Math.random() * 200 - 100;
+                    posAttr.array[i * 3 + 1] = Math.random() * 10;
+                    posAttr.array[i * 3 + 2] = Math.random() * 200 - 100;
+                }
+            }
+            posAttr.needsUpdate = true;
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Handle resize
+        window.addEventListener('resize', () => {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            camera.left = -frustumSize * (width / height) / 2;
+            camera.right = frustumSize * (width / height) / 2;
+            camera.top = frustumSize / 2;
+            camera.bottom = -frustumSize / 2;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        });
+    </script>
+</body>
+</html>

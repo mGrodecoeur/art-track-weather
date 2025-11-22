@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Windy Map</title>
+    <style>
+        html, body, #windy {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+    <script src="https://api.windy.com/assets/libBoot.js"></script>
+</head>
+<body>
+    <div id="windy"></div>
+    <script>
+        const options = {
+            key: 'WuYiTbq6tfEfd1pt0zQCSe06F7BsUupI',  // Replace with your Windy API key
+            lat: 40.7128,  // Your coordinates
+            lon: -74.0060,
+            zoom: 10,
+            overlay: 'rain',  // Replace with your desired weather overlay (e.g., 'wind', 'rain', 'temp')
+        };
+
+        // Initialize Windy API
+        windyInit(options, windyAPI => {
+            const { map } = windyAPI;
+
+            // You can add more layers or customize the map further here
+        });
+    </script>
+</body>
+</html>
