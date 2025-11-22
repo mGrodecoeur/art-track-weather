@@ -2,6 +2,7 @@ services:
   - type: web
     name: art-track-weather
     env: python
+    pythonVersion: "3.11"
     region: frankfurt  # Close to your track's lat/lon (Spain/Portugal)
     plan: free
     buildCommand: |
