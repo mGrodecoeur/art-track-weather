@@ -1,4 +1,5 @@
-# rain_dec.py → V2 NIGHT MODE - SINGLE PAGE - RACING FOCUSED
+app = Flask(__name__)
+
 import requests
 from flask import Flask, render_template_string, request
 from datetime import datetime, timedelta
@@ -14,28 +15,6 @@ from io import BytesIO
 import matplotlib.pyplot as plt
 import csv
 import os
-import atexit
-import logging
-
-app = Flask(__name__)
-
-logging.basicConfig(level=logging.INFO)
-
-_thread = None
-
-def start_background_fetcher():
-    global _thread
-    if _thread is None:
-        logging.info("Starting WeatherLink background fetcher thread...")
-        _thread = threading.Thread(target=fetch_and_store, daemon=False)
-        _thread.start()
-        logging.info("Background thread started successfully!")
-        # Optional: make sure it shuts down cleanly
-        atexit.register(lambda: _thread.join() if _thread.is_alive() else None)
-
-# This runs when the Flask app is created → works on Render + Gunicorn
-with app.app_context():
-    start_background_fetcher()
 
 # ==== CONFIG ====
 latitude = 36.710211448928376
@@ -535,6 +514,23 @@ def create_plots(selected_day_str):
 
     return plots, available_days, selected_day
 
+import atexit
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
+_thread = None
+
+def start_background_fetcher():
+    global _thread
+    if _thread is None:
+        logging.info("STARTING WEATHERLINK BACKGROUND THREAD – EVERY 5 MIN")
+        _thread = threading.Thread(target=fetch_and_store, daemon=False)
+        _thread.start()
+        logging.info("BACKGROUND THREAD IS NOW RUNNING!")
+
+with app.app_context():
+    start_background_fetcher()
 
 @app.route("/")
 def index():
@@ -637,6 +633,12 @@ def index():
                                   track_svg=track_svg,
                                   wind_dir_deg = wind_dir_deg
                                   )
+@app.route("/health")
+def health():
+    with data_lock:
+        count = len(historical_data)
+        last = historical_data[-1]['timestamp'].strftime('%H:%M') if historical_data else "none"
+    return f"OK – {count} records – last update: {last}"
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host="0.0.0.0", port=5000)
