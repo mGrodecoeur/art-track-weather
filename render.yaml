@@ -2,8 +2,10 @@ services:
   - type: web
     name: art-track-weather
     env: python
-    region: frankfurt    # closest to Spain
+    region: frankfurt  # Close to your track's lat/lon (Spain/Portugal)
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn rain_dec:app
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+    startCommand: gunicorn --workers 1 --bind 0.0.0.0:$PORT rain_dec:app
     autoDeploy: true
