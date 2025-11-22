@@ -618,5 +618,25 @@ def index():
 # Start background thread
 threading.Thread(target=fetch_and_store, daemon=True).start()
 
+# Global flag to ensure thread starts only once (prevents Gunicorn duplicates)
+_thread_started = False
+_thread_lock = threading.Lock()
+
+def start_background_thread():
+    global _thread_started
+    with _thread_lock:
+        if _thread_started:
+            print("Background thread already running — skipping duplicate start.")
+            return
+        print("Starting background data fetcher thread...")
+        t = threading.Thread(target=fetch_and_store, daemon=False)  # Non-daemon: Survives in Gunicorn
+        t.start()
+        _thread_started = True
+        print("Background thread started successfully!")
+
+# Start the thread on module import (works with Gunicorn)
+start_background_thread()
+
+# Your existing if __name__ block (keep for local testing)
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=False)
